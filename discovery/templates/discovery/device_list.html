@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trustpoint Device Discovery</title>
+    <!-- Auto-refresh the page every 5 seconds if a scan is running -->
+    {% if scan_running %}
+    <meta http-equiv="refresh" content="5">
+    {% endif %}
+    
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #003366; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        
+        .status-safe { color: green; font-weight: bold; background-color: #e6fffa; padding: 4px 8px; border-radius: 4px; }
+        .status-warning { color: #d97706; font-weight: bold; background-color: #fffbeb; padding: 4px 8px; border-radius: 4px; }
+        
+        .btn { padding: 10px 20px; font-size: 16px; border: none; cursor: pointer; border-radius: 4px; }
+        .btn-green { background-color: #4CAF50; color: white; }
+        .btn-green:hover { background-color: #45a049; }
+        .btn-disabled { background-color: #cccccc; cursor: not-allowed; color: #666; }
+        
+        .input-text { padding: 10px; font-size: 16px; width: 200px; margin-right: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 4px; }
+        .alert-info { color: #31708f; background-color: #d9edf7; border-color: #bce8f1; }
+        .alert-error { color: #a94442; background-color: #f2dede; border-color: #ebccd1; }
+    </style>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>🔭 Discovered Devices</h1>
+        <div>
+            {% if scan_running %}
+                <span style="margin-right: 10px; color: #666;">🔄 Scanner is running...</span>
+            {% else %}
+                <span style="margin-right: 10px; color: green;">● System Ready</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Messages Area -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-info{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Scan Control Area -->
+    <div style="margin-bottom: 20px; background: #eee; padding: 20px; border-radius: 8px;">
+        {% if scan_running %}
+            <button class="btn btn-disabled" disabled>
+                ⏳ Scanning in progress... (Auto-refreshing)
+            </button>
+        {% else %}
+            <form action="{% url 'start_scan' %}" method="post" style="display: flex; align-items: center;">
+                {% csrf_token %}
+                <label style="margin-right: 10px; font-weight: bold;">Target Network:</label>
+                <!-- NEW INPUT BOX -->
+                <input type="text" name="cidr" class="input-text" placeholder="e.g. 192.168.0.0/24" required value="192.168.0.0/24">
+                
+                <button type="submit" class="btn btn-green">
+                    🚀 Start New Scan
+                </button>
+            </form>
+        {% endif %}
+    </div>
+
+    <!-- Results Table -->
+    <table>
+        <thead>
+            <tr>
+                <th>IP Address</th>
+                <th>Hostname</th>
+                <th>Open Ports</th>
+                <th>SSL Status</th>
+                <th>Last Seen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for device in devices %}
+            <tr>
+                <td><strong>{{ device.ip_address }}</strong></td>
+                <td>{{ device.hostname|default:"-" }}</td>
+                <td>{{ device.open_ports }}</td>
+                <td>
+                    {% if device.ssl_info %}
+                        {% if device.ssl_info.is_self_signed %}
+                            <span class="status-warning">⚠️ Self-Signed</span>
+                            <br><small style="color: #666; font-size: 0.8em;">{{ device.ssl_info.issuer|truncatechars:30 }}</small>
+                        {% else %}
+                            <span class="status-safe">✅ Valid CA</span>
+                        {% endif %}
+                    {% else %}
+                        <span style="color: #ccc;">-</span>
+                    {% endif %}
+                </td>
+                <td>{{ device.last_seen|date:"M d, Y, H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px; color: #666;">
+                    No devices found yet. Enter a CIDR range above and scan!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
