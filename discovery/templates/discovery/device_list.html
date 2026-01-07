@@ -1,114 +1,163 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Trustpoint Device Discovery</title>
-    <!-- Auto-refresh the page every 5 seconds if a scan is running -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trustpoint Discovery</title>
+    <!-- Bootstrap 5 CSS (Professional Design Framework) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons (Standard Icons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Auto-refresh if scanning -->
     {% if scan_running %}
     <meta http-equiv="refresh" content="5">
     {% endif %}
-    
+
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #003366; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        
-        .status-safe { color: green; font-weight: bold; background-color: #e6fffa; padding: 4px 8px; border-radius: 4px; }
-        .status-warning { color: #d97706; font-weight: bold; background-color: #fffbeb; padding: 4px 8px; border-radius: 4px; }
-        
-        .btn { padding: 10px 20px; font-size: 16px; border: none; cursor: pointer; border-radius: 4px; }
-        .btn-green { background-color: #4CAF50; color: white; }
-        .btn-green:hover { background-color: #45a049; }
-        .btn-disabled { background-color: #cccccc; cursor: not-allowed; color: #666; }
-        
-        .input-text { padding: 10px; font-size: 16px; width: 200px; margin-right: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        
-        .alert { padding: 15px; margin-bottom: 20px; border: 1px solid transparent; border-radius: 4px; }
-        .alert-info { color: #31708f; background-color: #d9edf7; border-color: #bce8f1; }
-        .alert-error { color: #a94442; background-color: #f2dede; border-color: #ebccd1; }
+        body { background-color: #f4f6f9; }
+        .navbar { background-color: #2c3e50; } /* Professional Dark Blue */
+        .card { border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card-header { background-color: #fff; border-bottom: 1px solid #eee; font-weight: 600; }
+        .table th { font-weight: 600; color: #555; background-color: #f8f9fa; }
+        .port-badge { font-size: 0.8em; margin-right: 3px; }
     </style>
 </head>
 <body>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1>🔭 Discovered Devices</h1>
-        <div>
-            {% if scan_running %}
-                <span style="margin-right: 10px; color: #666;">🔄 Scanner is running...</span>
-            {% else %}
-                <span style="margin-right: 10px; color: green;">● System Ready</span>
-            {% endif %}
+
+    <!-- Top Navigation Bar -->
+    <nav class="navbar navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fa-solid fa-network-wired me-2"></i> Trustpoint Device Discovery
+            </a>
+            <span class="navbar-text text-white">
+                {% if scan_running %}
+                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-sync fa-spin"></i> Scanning Active</span>
+                {% else %}
+                    <span class="badge bg-success"><i class="fa-solid fa-circle-check"></i> System Ready</span>
+                {% endif %}
+            </span>
         </div>
-    </div>
+    </nav>
 
-    <!-- Messages Area -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-info{% endif %}">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-
-    <!-- Scan Control Area -->
-    <div style="margin-bottom: 20px; background: #eee; padding: 20px; border-radius: 8px;">
-        {% if scan_running %}
-            <button class="btn btn-disabled" disabled>
-                ⏳ Scanning in progress... (Auto-refreshing)
-            </button>
-        {% else %}
-            <form action="{% url 'start_scan' %}" method="post" style="display: flex; align-items: center;">
-                {% csrf_token %}
-                <label style="margin-right: 10px; font-weight: bold;">Target Network:</label>
-                <!-- NEW INPUT BOX -->
-                <input type="text" name="cidr" class="input-text" placeholder="e.g. 192.168.0.0/24" required value="192.168.0.0/24">
-                
-                <button type="submit" class="btn btn-green">
-                    🚀 Start New Scan
-                </button>
-            </form>
-        {% endif %}
-    </div>
-
-    <!-- Results Table -->
-    <table>
-        <thead>
-            <tr>
-                <th>IP Address</th>
-                <th>Hostname</th>
-                <th>Open Ports</th>
-                <th>SSL Status</th>
-                <th>Last Seen</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for device in devices %}
-            <tr>
-                <td><strong>{{ device.ip_address }}</strong></td>
-                <td>{{ device.hostname|default:"-" }}</td>
-                <td>{{ device.open_ports }}</td>
-                <td>
-                    {% if device.ssl_info %}
-                        {% if device.ssl_info.is_self_signed %}
-                            <span class="status-warning">⚠️ Self-Signed</span>
-                            <br><small style="color: #666; font-size: 0.8em;">{{ device.ssl_info.issuer|truncatechars:30 }}</small>
-                        {% else %}
-                            <span class="status-safe">✅ Valid CA</span>
-                        {% endif %}
-                    {% else %}
-                        <span style="color: #ccc;">-</span>
-                    {% endif %}
-                </td>
-                <td>{{ device.last_seen|date:"M d, Y, H:i" }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5" style="text-align: center; padding: 20px; color: #666;">
-                    No devices found yet. Enter a CIDR range above and scan!
-                </td>
-            </tr>
+    <div class="container">
+        
+        <!-- Messages Area (Popups) -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
             {% endfor %}
-        </tbody>
-    </table>
+        {% endif %}
+
+        <!-- Configuration Card -->
+        <div class="card">
+            <div class="card-header">
+                Scanner Configuration
+            </div>
+            <div class="card-body">
+                {% if scan_running %}
+                    <div class="d-flex align-items-center py-2">
+                        <div class="spinner-border text-primary me-3" role="status"></div>
+                        <div>
+                            <strong>Scan in progress...</strong><br>
+                            <span class="text-muted">The results will update automatically.</span>
+                        </div>
+                    </div>
+                {% else %}
+                    <form action="{% url 'start_scan' %}" method="post" class="row g-3 align-items-center">
+                        {% csrf_token %}
+                        <div class="col-auto">
+                            <label for="cidr" class="col-form-label fw-bold">Target Network CIDR:</label>
+                        </div>
+                        <div class="col-auto">
+                            <input type="text" id="cidr" name="cidr" class="form-control" placeholder="192.168.0.0/24" value="192.168.0.0/24" required>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa-solid fa-play me-1"></i> Run Scan
+                            </button>
+                        </div>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Results Card -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Discovered Assets</span>
+                <span class="badge bg-secondary">{{ devices|length }} Devices Found</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%">IP Address</th>
+                            <th style="width: 25%">Hostname</th>
+                            <th style="width: 20%">Open Ports</th>
+                            <th style="width: 25%">SSL Status</th>
+                            <th style="width: 15%">Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for device in devices %}
+                        <tr>
+                            <!-- IP Address -->
+                            <td class="font-monospace fw-bold text-primary">{{ device.ip_address }}</td>
+                            
+                            <!-- Hostname -->
+                            <td class="text-muted">{{ device.hostname|default:"-" }}</td>
+                            
+                            <!-- Ports as Badges -->
+                            <td>
+                                {% for port in device.open_ports %}
+                                    <span class="badge bg-secondary port-badge">{{ port }}</span>
+                                {% endfor %}
+                            </td>
+                            
+                            <!-- SSL Status -->
+                            <td>
+                                {% if device.ssl_info %}
+                                    {% if device.ssl_info.is_self_signed %}
+                                        <span class="badge bg-warning text-dark border border-warning">
+                                            <i class="fa-solid fa-triangle-exclamation"></i> Self-Signed
+                                        </span>
+                                        <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                                            Issued by: {{ device.ssl_info.issuer|truncatechars:20 }}
+                                        </div>
+                                    {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="fa-solid fa-lock"></i> Valid CA
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Timestamp -->
+                            <td class="small text-muted">{{ device.last_seen|date:"M d, H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-server fa-2x mb-3 text-secondary"></i><br>
+                                No devices discovered yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
