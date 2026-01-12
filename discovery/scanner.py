@@ -9,10 +9,18 @@ from cryptography.hazmat.backends import default_backend
 
 class OTScanner:
     def __init__(self, timeout: float = 1.0, max_workers: int = 20):
-        # Increased workers to 20 to make it faster
         self.timeout = timeout
         self.max_workers = max_workers
-        self.target_ports = [80, 443, 4840, 1883, 8883]
+        # EXPANDED PORT LIST (Web + Industrial + Mgmt)
+        self.target_ports = [
+            80, 443,            # HTTP/HTTPS
+            22,                 # SSH (Linux/Gateways)
+            502,                # Modbus TCP (Common Industrial)
+            102,                # Siemens S7 (PLCs)
+            44818,              # EtherNet/IP (Rockwell PLCs)
+            4840,               # OPC UA
+            1883, 8883          # MQTT / MQTT Secure
+        ]
         self.ssl_ports = [443, 8883]
 
     def _get_ips_from_cidr(self, cidr: str) -> List[str]:
@@ -90,11 +98,8 @@ class OTScanner:
             future_to_ip = {executor.submit(self._scan_host, ip): ip for ip in ips}
             
             for future in concurrent.futures.as_completed(future_to_ip):
-                # Print a dot for every IP checked (flush=True forces it to appear immediately)
-                print(".", end="", flush=True)
                 data = future.result()
                 if data:
                     discovered_devices.append(data)
         
-        print("\n") # New line after dots are finished
         return discovered_devices
